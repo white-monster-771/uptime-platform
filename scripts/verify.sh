@@ -12,3 +12,4 @@ else
   echo "$not_ready"
   exit 1
 fi
+python3 "$(dirname "$0")/check_health.py"

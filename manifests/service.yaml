@@ -4,11 +4,10 @@ metadata:
   name: kuma-svc
   namespace: uptime
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: kuma
   ports:
   - protocol: TCP
     port: 80
     targetPort: 3001
-    nodePort: 30080

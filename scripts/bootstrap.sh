@@ -1,8 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENV_FILE="$REPO_ROOT/../.env"
+ENV_FILE="$REPO_ROOT/.env"
 [ -f "$ENV_FILE" ] && set -a && . "$ENV_FILE" && set +a
+
+HOST_IP="${HOST_IP:-}"
+case "$HOST_IP" in ""|CHANGE_ME) HOST_IP="$(hostname -I | awk '{print $1}')";; esac
 PORT_HTTP="${PORT_HTTP:-80}"
 
 command -v docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
@@ -27,6 +30,6 @@ k3d kubeconfig merge uptime --kubeconfig-switch-context >/dev/null
 
 cd "$REPO_ROOT"
 bash scripts/deploy.sh
-echo "Platform:  http://${HOST_IP:-$(hostname -I | awk '{print $1}')}:${PORT_HTTP}/"
-echo "Prometheus: http://${HOST_IP:-$(hostname -I | awk '{print $1}')}:${PORT_HTTP}/prometheus"
-echo "Demo:       http://${HOST_IP:-$(hostname -I | awk '{print $1}')}:${PORT_HTTP}/demo"
+echo "Platform:   http://${HOST_IP}:${PORT_HTTP}/"
+echo "Prometheus: http://${HOST_IP}:${PORT_HTTP}/prometheus"
+echo "Demo:       http://${HOST_IP}:${PORT_HTTP}/demo"

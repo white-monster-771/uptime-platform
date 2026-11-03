@@ -1,56 +1,42 @@
 # Uptime Platform
 
-Reproducible Kubernetes monitoring stand. Built as a portfolio piece, not a
-turnkey product: the goal is that a stranger can `clone -> bootstrap -> verify`
-and see a live availability monitor with proven outage detection and a tested
-backup/restore path.
+Небольшой стенд на Kubernetes, который я собрал, чтобы разобраться в K8s. Рабочая сборка, которая запускается на чистой системе
 
-## Stack
-- k3d (single-server cluster), Debian/Ubuntu host
-- Uptime Kuma (availability UI) + PVC for the SQLite DB
-- Traefik (Ingress Controller, metrics exposed)
-- Prometheus (scrapes Traefik; Kuma metrics limited by upstream auth - see Notes)
-- whoami demo backend for failure simulation
-- Bash + one Python tool (`scripts/check_health.py`, stdlib only)
+Kuma следит за доступностью сервисов / Traefik - обратный прокси / Prometheus собирает метрики с шлюза
 
-## What it looks like
+## Перед запуском
 
-Healthy state — Uptime Kuma tracking the demo backend:
+СТАВИТЬ ТОЛЬКО НА ЧИСТУЮ МАШИНУ. bootstrap.sh ставит docker, helm, kubectl, k3d и создаёт кластер, который занимает порты 80 и 443. Запускать нужно с правами
 
-![Kuma UP](docs/screenshots/01-kuma-up.png)
+## Быстрый старт
 
-Outage detected — same dashboard after `simulate-outage.sh`, monitor flips to Down:
+    git clone https://github.com/white-monster-771/uptime-platform.git
+    cd uptime-platform
+    cp .env.example .env
+    ./scripts/bootstrap.sh
+    ./scripts/verify.sh
 
-![Kuma DOWN](docs/screenshots/02-kuma-down.png)
+Скрипты сами подхватывают айпишник
 
-Machine-readable health — `check_health.py` reads Prometheus JSON and encodes the
-verdict as a process exit code (something shell cannot do cleanly):
+Если под долго висит в ContainerCreating, попробуй отрубить впн и запреты, тк он скачивает всё необходимое
 
-![Health check](docs/screenshots/03-health-check.png)
+## Стек
 
-## Quickstart (clean VM)
+- k3d, кластер из одного сервера
+- Uptime Kuma
+- Traefik как ingress controller :) публикующий собственные метрики
+- Prometheus скрейпящий Traefik
+- whoami как демо-бэкенд, который я намеренно ломаю для проверки детекта
 
-    git clone <repo> && cd uptime-platform
-    cp .env.example .env      # set HOST_IP, PORT_HTTP
-    ./scripts/bootstrap.sh    # deps -> cluster -> manifests
-    ./scripts/verify.sh       # all pods healthy?
+## Скрипты
 
-## Operate
-- Health of the observability layer: `python3 scripts/check_health.py`
-- Simulate outage / recover: `scripts/simulate-outage.sh` / `recover-outage.sh`
-- Backup DB / restore-drill / cleanup: `scripts/backup.sh` / `restore-drill.sh` / `restore-cleanup.sh`
+- bootstrap.sh: зависимости, затем кластер, затем деплой
+- deploy.sh: применяет все манифесты
+- verify.sh: здоровье подов плюс проверка Prometheus
+- check_health.py: чекает Prometheus по HTTP и решает up/down
+- backup.sh, restore-*: копируют базу Kuma вместе с wal-файлами в ~/backups, восстанавливают копию в одноразовое пространство имён, не трогая прод, и удаляют это пространство
+- simulate-outage.sh, recover-outage.sh: гасят демо-бэкенд до нуля и поднимают обратно, чтобы посмотреть, как Kuma переключается в DOWN и назад в UP
 
-## Boundaries (known, deliberate)
-- Targets a CLEAN host: bootstrap hard-binds PORT_HTTP/443 and aborts if busy
-  rather than overwriting an existing ingress.
-- Uptime Kuma does NOT auto-discover cluster services; monitors are added via
-  UI. Auto-discovery would be a different architecture (Prometheus Operator +
-  Blackbox Exporter), intentionally out of scope.
-- Management is scripts + `.env`, not a web admin panel.
-- Kuma `/metrics` has no HTTP API in this build (socket.io only); Prometheus
-  scrapes Traefik instead. Kuma metrics are a roadmap item, not a defect.
+## Известные ограничения
 
-## Roadmap (not debt)
-- Integration tests (pytest) for the outage scenario
-- Helm chart packaging with values.yaml
-- TLS via cert-manager
+Мониторы для кумы добавляются через веб-интерфейс. Авто детекта нет
